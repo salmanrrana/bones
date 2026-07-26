@@ -5,7 +5,7 @@ Bones is a skills-only quality workflow. The product is the `skills/` directory;
 ## Architecture Rules
 
 - Workflow truth lives in the directive computation (`skills/bones/scripts/`) and recorded evidence files — never in prose alone. If a gate matters, `next.mjs` must compute it; the phase skills explain it.
-- Scripts must stay dependency-free ES modules requiring only Node 22+ and Git. No npm dependencies, no build step, no installation.
+- Scripts must stay dependency-free ES modules requiring only Node 24+ and Git. No npm dependencies, no build step, no installation.
 - Spawn subprocesses as executable plus argv with `shell: false`. Do not construct shell command strings.
 - Bind all evidence to the exact Git SHA it certifies. New commits must invalidate downstream evidence.
 - Keep every skill's frontmatter to `name` and `description`, in that order, and keep descriptions explicit that Bones is opt-in (router) or loop-only (phase skills).

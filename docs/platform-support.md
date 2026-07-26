@@ -1,14 +1,14 @@
 # Platform Support
 
-Bones supports current 64-bit Linux, macOS, and Windows environments capable of running Node.js 22+ and Git. Nothing is installed: the skills' scripts run in place with `node`.
+Bones supports current 64-bit Linux, macOS, and Windows environments capable of running Node.js 24+ and Git. Nothing is installed: the skills' scripts run in place with `node`.
 
 ## Runtime Matrix
 
 | Operating system | CI runner | Node versions |
 | --- | --- | --- |
-| Linux | `ubuntu-latest` | 22, 24 |
-| macOS | `macos-latest` | 22, 24 |
-| Windows | `windows-latest` | 22, 24 |
+| Linux | `ubuntu-latest` | 24, 26 |
+| macOS | `macos-latest` | 24, 26 |
+| Windows | `windows-latest` | 24, 26 |
 
 ## Portability Rules
 

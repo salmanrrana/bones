@@ -16,7 +16,7 @@ You never decide the current phase from memory or conversation. You always ask t
 
 ## Requirements
 
-Node.js 22+ and Git on PATH. Run every script from the project worktree. All scripts print JSON to stdout on success and a JSON error to stderr with a non-zero exit on failure.
+Node.js 24+ and Git on PATH. Run every script from the project worktree. All scripts print JSON to stdout on success and a JSON error to stderr with a non-zero exit on failure.
 
 Throughout this skill, `<skill>` means the directory containing this SKILL.md file.
 

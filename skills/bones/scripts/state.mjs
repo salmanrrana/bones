@@ -1,5 +1,5 @@
 // Shared state helpers for the Bones skill scripts.
-// Zero dependencies. Requires Node 22+ and Git on PATH.
+// Zero dependencies. Requires Node 24+ and Git on PATH.
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";

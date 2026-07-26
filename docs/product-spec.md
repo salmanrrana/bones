@@ -71,7 +71,7 @@ There is no state outside the worktree. Moving or deleting `.bones/` deletes run
 
 ## Portability Definition
 
-Supported means the skills and their scripts run on Linux, macOS, and native Windows with Node.js 22+ and Git. Scripts use Node path and filesystem APIs and argv spawning — no Bash, PowerShell, or shell-string interpolation. CI validates skill structure and runs the directive-loop exercise on all three operating systems.
+Supported means the skills and their scripts run on Linux, macOS, and native Windows with Node.js 24+ and Git. Scripts use Node path and filesystem APIs and argv spawning — no Bash, PowerShell, or shell-string interpolation. CI validates skill structure and runs the directive-loop exercise on all three operating systems.
 
 ## MVP Boundary
 

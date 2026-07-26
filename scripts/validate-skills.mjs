@@ -1,6 +1,6 @@
 // Validate the Bones skill suite: structure, frontmatter, and a full
 // directive-loop lifecycle exercised in a temporary Git repository.
-// Requires only Node 22+ and Git. Run with: node scripts/validate-skills.mjs
+// Requires only Node 24+ and Git. Run with: node scripts/validate-skills.mjs
 
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";

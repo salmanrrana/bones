@@ -25,7 +25,7 @@ Gates the directive script computes: every configured check must pass for the ex
 
 ## Requirements
 
-- Node.js 22+ and Git on PATH
+- Node.js 24+ and Git on PATH
 - An agent that reads Agent Skills (`SKILL.md` directories)
 
 ## Install
@@ -61,6 +61,6 @@ scripts/                Repo-side skill validation (development only)
 node scripts/validate-skills.mjs   # validate skill structure and exercise the directive loop
 ```
 
-No dependencies, no install step — the repository needs only Node 22+ and Git.
+No dependencies, no install step — the repository needs only Node 24+ and Git.
 
 See [docs/product-spec.md](docs/product-spec.md), [docs/architecture.md](docs/architecture.md), [docs/state-format.md](docs/state-format.md), and [docs/platform-support.md](docs/platform-support.md).

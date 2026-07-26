@@ -63,7 +63,7 @@ Every evidence file names the exact Git SHA it certifies. Evidence for an older 
 
 ## Scripts Are Skill Assets, Not a CLI
 
-`start.mjs`, `next.mjs`, and `check.mjs` (plus the shared `state.mjs`) are plain ES modules with zero dependencies, requiring only Node 22+ and Git. They are invoked in place from the skill directory. Design rules:
+`start.mjs`, `next.mjs`, and `check.mjs` (plus the shared `state.mjs`) are plain ES modules with zero dependencies, requiring only Node 24+ and Git. They are invoked in place from the skill directory. Design rules:
 
 - Pure functions of files + Git state; no hidden mutable state, no daemon, no lockfiles.
 - JSON result on stdout, JSON error on stderr, non-zero exit on failure.
