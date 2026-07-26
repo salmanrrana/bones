@@ -1,4 +1,4 @@
-# Bones
+# 🦴 Bones
 
 **A quality workflow for AI coding agents that is literally just skills.** No CLI to install, no server, no database, no accounts. You copy five folders of markdown (plus three tiny Node scripts) into your agent's skills directory, say `$bones`, and your agent stops being able to say "done!" without proving it.
 
@@ -6,16 +6,21 @@
 
 You know how an AI agent will happily write some code, run half a test, and declare victory? Bones is the adult in the room.
 
-Think of it like a **board game where the agent can't move without rolling the dice**:
+The name works both ways:
 
-- The **dice** is a tiny script (`next.mjs`) that looks at what's actually on disk — real files, real Git commits — and says "your one and only next move is X."
-- The **board squares** are five phases: implement → validate → review → verify → stop.
-- The **rulebook** is five skills (markdown files) that tell the agent exactly how to play each square.
-- The **receipts** are JSON evidence files, each stamped with the exact Git commit they prove something about.
+**🦴 It's a skeleton.** Your agent is the muscle — creative, flexible, does the actual work. Bones is the rigid structure underneath that keeps the work standing up straight. Muscles decide *how* to move; the skeleton decides *what shapes are even possible*. No skeleton, and "done" collapses into a puddle of "well, it looked done."
 
-The agent never gets to decide "I think I'm done" from memory. It has to ask the script, and the script only believes files and Git. Change one line of code after review? Every downstream receipt is instantly void and you're back on the implement square. Try to review your own code? Rejected — the reviewer must be a different actor. Claim verification passed while a criterion failed? The script reads the receipt and sends you back.
+**🁢 It's dominoes.** The workflow is a line of five tiles:
 
-That's the whole trick: **the workflow can't drift, because it's never remembered — it's recomputed from disk every single step.**
+```text
+🁢 implement → 🁢 validate → 🁢 review → 🁢 verify → 🏁 stop
+```
+
+Dominoes have one beautiful rule: **a tile only falls if the tile before it actually fell.** Not "probably fell." Not "the agent remembers it falling." Each tile leaves a receipt — a JSON evidence file stamped with the exact Git commit it proves something about — and a tiny script (`next.mjs`) walks the line, checks the receipts against real files and real Git, and tells the agent which single tile is next.
+
+And here's the part that keeps everyone honest: **push a new commit, and every domino behind it stands back up.** Validated, reviewed, verified — doesn't matter. The receipts are now for old bones, so the chain replays from `implement`. Try to review your own code? That tile won't tip — the reviewer must be a different actor. Claim verification passed while a criterion failed? The script reads the receipt and stands the tile back up.
+
+That's the whole trick: **the workflow can't drift, because it's never remembered — it's recomputed from the receipts on disk every single step.**
 
 ## Install
 
@@ -49,8 +54,8 @@ flowchart TD
     A["🗣️ You invoke $bones with a task<br/>+ acceptance criteria"] --> B["📸 start.mjs snapshots the request,<br/>base commit, and quality policy<br/>into .bones/runs/&lt;run-id&gt;/"]
     B --> LOOP
 
-    subgraph LOOP["🔁 The directive loop — ask next.mjs, obey, repeat"]
-        N{"🎲 next.mjs reads evidence files<br/>+ git HEAD and answers:<br/>what is the ONE valid next move?"}
+    subgraph LOOP["🔁 The domino line — ask next.mjs, obey, repeat"]
+        N{"🦴 next.mjs reads the receipts<br/>+ git HEAD and answers:<br/>which ONE domino is next?"}
 
         N -->|implement / fix| I["🔨 bones-implement<br/>write code, commit it,<br/>record the commit SHA"]
         N -->|validate| V["✅ bones-validate<br/>check.mjs runs the project's real<br/>checks and records the results"]
@@ -68,15 +73,15 @@ flowchart TD
 
     N -->|stop 🏁| Z["📋 Final report: run id, final SHA,<br/>check results, review findings,<br/>evidence per criterion"]
 
-    NEW["⚠️ Any new commit at any point"] -.->|voids all downstream receipts,<br/>back to implement| N
+    NEW["⚠️ Any new commit at any point"] -.->|stands every downstream domino<br/>back up — replay from implement| N
 ```
 
-And the gates that make it honest:
+And the reasons a domino refuses to tip:
 
 ```mermaid
 flowchart LR
-    subgraph GATES["🚧 What next.mjs refuses to let past"]
-        G1["HEAD ≠ recorded SHA<br/>→ back to implement"]
+    subgraph GATES["🚧 A domino only falls on a real receipt"]
+        G1["HEAD ≠ recorded SHA<br/>→ chain restarts at implement"]
         G2["Check not recorded by check.mjs<br/>→ doesn't count, still pending"]
         G3["Reviewer id == implementer id<br/>→ review rejected, get a real reviewer"]
         G4["passed: true but a criterion failed<br/>→ re-verify honestly"]
@@ -87,12 +92,12 @@ flowchart LR
 ## What's actually in the box
 
 ```text
-skills/bones            🎲 The router: init, start/resume, the loop, stop report
+skills/bones            🦴 The spine: init, start/resume, the domino line, stop report
   └── scripts/          start.mjs · next.mjs · check.mjs · state.mjs (zero deps)
-skills/bones-implement  🔨 How to play the implement/fix square
-skills/bones-validate   ✅ How to play the validate square
-skills/bones-review     🔍 How to play the review square (independence rules)
-skills/bones-verify     🧪 How to play the verify square (evidence rules)
+skills/bones-implement  🔨 How to tip the implement/fix domino
+skills/bones-validate   ✅ How to tip the validate domino
+skills/bones-review     🔍 How to tip the review domino (independence rules)
+skills/bones-verify     🧪 How to tip the verify domino (evidence rules)
 docs/                   Spec, architecture, state format, platform support
 scripts/                Repo-side validator (development only)
 ```
