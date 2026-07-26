@@ -6,21 +6,22 @@
 
 You know how an AI agent will happily write some code, run half a test, and declare victory? Bones is the adult in the room.
 
-The name works both ways:
+**Bones is slang for dominoes — the game.** So imagine a domino table, a set of tiles, and a strict referee.
 
-**🦴 It's a skeleton.** Your agent is the muscle — creative, flexible, does the actual work. Bones is the rigid structure underneath that keeps the work standing up straight. Muscles decide *how* to move; the skeleton decides *what shapes are even possible*. No skeleton, and "done" collapses into a puddle of "well, it looked done."
+The agent is the player: they do the actual coding. Bones is the referee and the line of tiles. It keeps the game simple:
 
-**🁢 It's dominoes.** The workflow is a line of five tiles:
+- **Five dominoes** are the five phases: implement → validate → review → verify → stop.
+- **Each tile has to be legitimately played** before the next tile can be played. A passing test is not a review. A review is not acceptance proof.
+- **The referee (`next.mjs`) checks the table** — real files, real receipts, and real Git — then tells the agent which single tile is next.
+- **Every play leaves a scorecard entry**: a JSON evidence file stamped with the exact Git commit it proves something about.
 
 ```text
 🁢 implement → 🁢 validate → 🁢 review → 🁢 verify → 🏁 stop
 ```
 
-Dominoes have one beautiful rule: **a tile only falls if the tile before it actually fell.** Not "probably fell." Not "the agent remembers it falling." Each tile leaves a receipt — a JSON evidence file stamped with the exact Git commit it proves something about — and a tiny script (`next.mjs`) walks the line, checks the receipts against real files and real Git, and tells the agent which single tile is next.
+Here's the part that keeps the game honest: **make a new commit, and every later tile is put back on the table.** The test, review, and verification receipts were for the old commit, so the chain starts again at `implement`. Try to review your own code? The referee rejects the play — the reviewer must be a different actor. Claim verification passed while a criterion failed? The referee reads the scorecard and rejects that play too.
 
-And here's the part that keeps everyone honest: **push a new commit, and every domino behind it stands back up.** Validated, reviewed, verified — doesn't matter. The receipts are now for old bones, so the chain replays from `implement`. Try to review your own code? That tile won't tip — the reviewer must be a different actor. Claim verification passed while a criterion failed? The script reads the receipt and stands the tile back up.
-
-That's the whole trick: **the workflow can't drift, because it's never remembered — it's recomputed from the receipts on disk every single step.**
+That's the whole trick: **the workflow can't drift, because it isn't remembered — it is rechecked against the table every single turn.**
 
 ## Install
 
@@ -73,14 +74,14 @@ flowchart TD
 
     N -->|stop 🏁| Z["📋 Final report: run id, final SHA,<br/>check results, review findings,<br/>evidence per criterion"]
 
-    NEW["⚠️ Any new commit at any point"] -.->|stands every downstream domino<br/>back up — replay from implement| N
+    NEW["⚠️ Any new commit at any point"] -.->|puts every later domino<br/>back on the table — replay from implement| N
 ```
 
-And the reasons a domino refuses to tip:
+And the plays the referee rejects:
 
 ```mermaid
 flowchart LR
-    subgraph GATES["🚧 A domino only falls on a real receipt"]
+    subgraph GATES["🚧 A domino only gets played with a real receipt"]
         G1["HEAD ≠ recorded SHA<br/>→ chain restarts at implement"]
         G2["Check not recorded by check.mjs<br/>→ doesn't count, still pending"]
         G3["Reviewer id == implementer id<br/>→ review rejected, get a real reviewer"]
@@ -92,12 +93,12 @@ flowchart LR
 ## What's actually in the box
 
 ```text
-skills/bones            🦴 The spine: init, start/resume, the domino line, stop report
+skills/bones            🦴 The referee: init, start/resume, the domino line, stop report
   └── scripts/          start.mjs · next.mjs · check.mjs · state.mjs (zero deps)
-skills/bones-implement  🔨 How to tip the implement/fix domino
-skills/bones-validate   ✅ How to tip the validate domino
-skills/bones-review     🔍 How to tip the review domino (independence rules)
-skills/bones-verify     🧪 How to tip the verify domino (evidence rules)
+skills/bones-implement  🔨 How to play the implement/fix domino
+skills/bones-validate   ✅ How to play the validate domino
+skills/bones-review     🔍 How to play the review domino (independence rules)
+skills/bones-verify     🧪 How to play the verify domino (evidence rules)
 docs/                   Spec, architecture, state format, platform support
 scripts/                Repo-side validator (development only)
 ```
