@@ -1,128 +1,109 @@
 ---
 name: bones
-description: Explicitly invoked, provider-neutral software implementation, validation, review, and verification through the Bones CLI. Use only when the user names Bones, invokes $bones, or explicitly says to run the current task on or through Bones. Do not activate for ordinary coding, review, debugging, planning, or operational requests that do not explicitly request Bones.
+description: Explicitly invoked, provider-neutral quality workflow for software tasks — implementation, validation, independent review, and acceptance verification, driven entirely by skills and recorded file evidence. Use only when the user names Bones, invokes $bones, or explicitly says to run the current task on or through Bones. Do not activate for ordinary coding, review, debugging, planning, or operational requests that do not explicitly request Bones.
 ---
 
 # Bones
 
-Proceed only because the user explicitly invoked Bones for the current task. Do not carry Bones into later tasks unless the user explicitly invokes it again. Use the `bones` CLI as the source of workflow truth while preserving the user's control over scope.
+Proceed only because the user explicitly invoked Bones for the current task. Do not carry Bones into later tasks unless the user explicitly invokes it again.
 
-## Start or Resume
+Bones is a skills-only workflow. There is no CLI, server, or database. Workflow truth lives in two places:
 
-1. Run `bones doctor --json` from the project worktree. Stop and report the returned error if Bones, Git, the platform, or the state directory is unhealthy.
-2. Run `bones init --json` when `.bones/project.json` is absent.
-3. Inspect `.bones/workflow.json`. Ensure `validation.checks` contains at least one command expressed as an argv array, never as a shell string.
-4. To resume, run `bones list --json`, select the run explicitly named by the user or the only active run, then run `bones next --json <run-id>`.
-5. To start, preserve the user's request, constraints, and acceptance criteria in one inline work-contract string, then run `bones start --json --request "<work contract>"`.
+1. **Recorded evidence** — JSON files under `.bones/runs/<run-id>/`, each bound to an exact Git commit SHA.
+2. **The directive scripts** — small dependency-free Node scripts inside this skill that read the evidence plus Git state and print the one valid next action.
 
-Do not start a second run merely because a run is difficult. Resume from the recorded directive after interruptions or provider handoffs.
-Do not create a ticket, task file, plan file, or backlog item for Bones intake.
+You never decide the current phase from memory or conversation. You always ask the directive script.
 
-## Use Available Tools
+## Requirements
 
-Use whatever tools the task requires, including provider-native tools, `acli`, `pup`, GitHub clients, browsers, test runners, containers, and observability tools. Bones controls phase transitions and evidence; it does not replace or restrict the agent's toolbox. Keep external side effects within the authority granted by the user's request.
+Node.js 22+ and Git on PATH. Run every script from the project worktree. All scripts print JSON to stdout on success and a JSON error to stderr with a non-zero exit on failure.
 
-## Execute the Directive Loop
+Throughout this skill, `<skill>` means the directory containing this SKILL.md file.
 
-Run `bones next --json <run-id>`. Read `directive.id`, `directive.kind`, `directive.gitSha`, and `directive.requiredChecks`. Perform only the matching action below. After every action, call `bones next --json <run-id>` again because every recorded event changes the directive ID.
+## Initialize the Project (once)
 
-### `configure`
+If `.bones/project.json` does not exist:
 
-Add explicit validation checks to `.bones/workflow.json`. Each check must have a unique `id`, a non-empty `argv`, and a positive `timeoutMs`. Because run policy is immutable, start a new run after correcting a legacy run that reached this directive.
-
-### `implement` or `fix`
-
-Implement the task or address every blocking finding. Run focused diagnostics as useful, but do not claim the validation gate from ad hoc commands. Commit the resulting code, obtain the exact Git SHA, and write a JSON payload under `.bones/evidence/`:
+1. Create `.bones/` and add a `.bones/` line to the repository's `.gitignore` (create `.gitignore` if absent).
+2. Write `.bones/project.json`:
 
 ```json
 {
-  "gitSha": "<git rev-parse HEAD>",
-  "summary": "What changed and why",
-  "actor": {
-    "id": "<stable actor identity>",
-    "provider": "<provider>",
-    "model": "<optional model>",
-    "role": "implementer"
+  "schemaVersion": 2,
+  "name": "<repository directory name>",
+  "projectId": "<random UUID>",
+  "createdAt": "<ISO timestamp>"
+}
+```
+
+3. Write `.bones/workflow.json` with at least one real validation check discovered from the project (for example the project's typecheck+test command). Every check needs a unique `id`, an `argv` array (never a shell string), and a positive `timeoutMs`:
+
+```json
+{
+  "schemaVersion": 2,
+  "validation": {
+    "checks": [
+      { "id": "check", "argv": ["pnpm", "check"], "timeoutMs": 300000 }
+    ]
+  },
+  "review": {
+    "requireIndependentActor": true,
+    "blockingSeverities": ["critical", "major"]
+  },
+  "verification": {
+    "requireCleanWorktree": true,
+    "requireCriterionCoverage": true
   }
 }
 ```
 
-Submit it with `bones submit --json <run-id> <directive-id> <payload-file>`. Project initialization excludes `.bones/evidence/` from Git so protocol payloads do not dirty the verified worktree. Store review and verification payloads there as well.
+Show the user the checks you chose and adjust if they object.
 
-### `validate`
+## Start or Resume
 
-For every ID in `directive.requiredChecks`, run:
+- **Resume**: run `node <skill>/scripts/next.mjs` (add the run id if several exist). Continue from the printed directive. Resume after interruptions; do not start a second run because a run is difficult.
+- **Start**: condense the user's request, constraints, and acceptance criteria into one inline work-contract string. Each acceptance criterion must be individually checkable. Then:
 
 ```text
-bones exec --json <run-id> <directive-id> <check-id>
+node <skill>/scripts/start.mjs --request "<work contract>"
 ```
 
-Refresh the directive after each check. Bones executes the command snapshot captured when the run started and records its exit code, duration, and output digests. Never substitute an unrecorded check result. Fix the code through the next `fix` or `implement` directive when checks cannot pass.
+Do not create a ticket, task file, plan file, or backlog item for Bones intake.
 
-### `review`
+## The Directive Loop
 
-Use an actor whose stable identity differs from the implementer when independent review is required. Review the exact `directive.gitSha` for correctness, regressions, security, silent failures, and unnecessary complexity. Do not change code during this directive. Write structured evidence:
+Repeat until the directive kind is `stop`:
 
-```json
-{
-  "gitSha": "<directive.gitSha>",
-  "summary": "Review conclusion",
-  "actor": {
-    "id": "<independent actor identity>",
-    "provider": "<provider>",
-    "model": "<optional model>",
-    "role": "reviewer"
-  },
-  "findings": [
-    {
-      "severity": "major",
-      "title": "Concise finding",
-      "detail": "Impact and concrete correction",
-      "file": "optional/path.ts",
-      "line": 42
-    }
-  ]
-}
-```
+1. Run `node <skill>/scripts/next.mjs <run-id>`.
+2. Read `kind`, `gitSha`, `reason`, and any `requiredChecks` / `blockingFindings`.
+3. Load the matching phase skill and do exactly what it says:
 
-Use an empty `findings` array only after actually reviewing the diff. Submit the payload with `bones submit --json <run-id> <directive-id> <payload-file>`. Bones derives the blocking count from the run's snapshotted severity policy.
+| Directive kind | Phase skill to load |
+| --- | --- |
+| `configure` | fix `.bones/workflow.json`, then start a new run (policy is immutable per run) |
+| `implement`, `fix` | `bones-implement` |
+| `validate` | `bones-validate` |
+| `review` | `bones-review` |
+| `verify` | `bones-verify` |
+| `stop` | report and stop (below) |
 
-### `verify`
+4. After completing the phase skill's action, immediately rerun `next.mjs`. Never chain two phases from one directive — evidence you just recorded changes the directive.
 
-Verify the acceptance criteria against the exact reviewed SHA. Use a clean environment when feasible and capture concrete evidence for each criterion. Write:
+The directive script re-derives everything from files and Git on every call, so a stale belief about the phase is always corrected by rerunning it.
 
-```json
-{
-  "gitSha": "<directive.gitSha>",
-  "summary": "Verification conclusion",
-  "actor": {
-    "id": "<verifier identity>",
-    "provider": "<provider>",
-    "model": "<optional model>",
-    "role": "verifier"
-  },
-  "passed": true,
-  "criteria": [
-    {
-      "id": "criterion-1",
-      "passed": true,
-      "evidence": "Exact command, observation, or artifact"
-    }
-  ]
-}
-```
+## `stop`
 
-Submit it with `bones submit --json <run-id> <directive-id> <payload-file>`. Do not mark `passed` true with missing or failing criterion evidence. Bones also rejects passing verification when the Git worktree has non-ignored changes if the run requires a clean worktree.
+Report to the user: the run id, final Git SHA, every recorded check result, the review summary and findings count, and each acceptance criterion with its evidence. Then stop. This is the only successful terminal state.
 
-### `stop`
+## Use Available Tools
 
-Stop work and report the run ID, final Git SHA, recorded checks, review result, and criterion evidence. This is the only successful terminal state.
+Use whatever tools the task requires — provider-native tools, test runners, browsers, containers, GitHub clients. Bones controls phase transitions and evidence; it does not restrict your toolbox. Keep external side effects within the authority granted by the user's request.
 
-## Preserve Protocol Integrity
+## Protocol Integrity
 
-- Never edit the Bones runtime state directory or event files.
-- Never reuse a directive ID after any event has been recorded.
-- Never submit evidence for a different Git SHA.
-- Never collapse executable plus arguments into a shell command string.
-- Treat stale directives, revision conflicts, invalid schemas, failed integrity checks, timeouts, and unavailable independent reviewers as visible blockers.
-- Rerun `bones next --json <run-id>` after a stale-directive error; do not guess the current phase.
+- Never write evidence for a Git SHA other than the one the directive names.
+- Never edit or delete files under `.bones/runs/` except by appending new evidence as a phase skill instructs; recorded evidence is immutable.
+- Never mark a check passed without a recorded `checks/<id>.json` produced by `check.mjs`.
+- Never substitute an ad hoc command result for a configured check.
+- If any script reports malformed or invalid evidence, surface it to the user as a blocker; do not silently rewrite files to make the error disappear.
+- If the same directive persists after you recorded its evidence, the evidence did not satisfy the gate. Read the `reason` field and fix the actual deficiency; do not loop blindly more than twice — escalate to the user instead.

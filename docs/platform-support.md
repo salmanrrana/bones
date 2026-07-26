@@ -1,6 +1,6 @@
 # Platform Support
 
-Bones supports current 64-bit Linux, macOS, and Windows environments capable of running a supported Node.js LTS release.
+Bones supports current 64-bit Linux, macOS, and Windows environments capable of running Node.js 22+ and Git. Nothing is installed: the skills' scripts run in place with `node`.
 
 ## Runtime Matrix
 
@@ -13,25 +13,13 @@ Bones supports current 64-bit Linux, macOS, and Windows environments capable of 
 ## Portability Rules
 
 - Resolve paths with `node:path`; never concatenate path separators manually.
-- Resolve state directories from `BONES_STATE_HOME` first, then native OS conventions.
-- Store configuration and protocol payloads as UTF-8 JSON with stable schemas.
-- Resolve submission payload paths within the project root, including protection against symlink escapes.
-- Invoke commands as executable plus argv. Do not interpolate shell command strings.
-- Keep Windows command-wrapper behavior inside the process adapter.
-- Use Node filesystem APIs rather than `bash`, PowerShell, `sed`, `grep`, or platform package managers in product code.
-- Normalize provider exits, signals, timeouts, and cancellation into typed errors.
-- Keep output machine-readable and write diagnostics separately from JSON results.
-
-## State Locations
-
-The default state roots are:
-
-- Linux: `$XDG_STATE_HOME/bones` or `~/.local/state/bones`
-- macOS: `~/Library/Application Support/Bones`
-- Windows: `%LOCALAPPDATA%\Bones`
-
-Set `BONES_STATE_HOME` to override these locations on any platform.
+- Keep all state inside the project's `.bones/` directory; no OS-specific state directories.
+- Store all state and evidence as UTF-8 JSON with the shapes in [state-format.md](state-format.md).
+- Spawn processes as executable plus argv with `shell: false`. Never interpolate shell command strings.
+- Use Node filesystem APIs rather than `bash`, PowerShell, `sed`, `grep`, or platform package managers in scripts.
+- Normalize subprocess exits, signals, and timeouts into recorded fields (`exitCode`, `timedOut`), not thrown surprises.
+- Emit machine-readable JSON on stdout and errors on stderr, one object each.
 
 ## Known Boundary
 
-CI proves the CLI and workflow kernel on hosted operating-system images. Provider-specific launch adapters will have their own conformance tests because individual provider CLIs can support a narrower platform set than Bones itself.
+CI proves the skill scripts and the directive-loop lifecycle on hosted operating-system images. Whether a given AI provider's client discovers `.agents/skills/` on a given platform is that client's contract, not Bones's; the skills themselves are plain files and impose no additional platform requirements.

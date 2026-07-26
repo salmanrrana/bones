@@ -2,104 +2,98 @@
 
 ## Purpose
 
-Bones extracts the quality workflow from a larger project-management application into two deliberately small products:
-
-1. A standards-compatible Agent Skill that any compatible coding agent can discover and follow.
-2. A local CLI that owns state, policy, evidence, concurrency, and workflow decisions.
-
-There is no board, web server, provider SDK, prompt router, or required cloud account. Providers remain interchangeable because they all speak the same file-and-JSON CLI protocol.
+Bones is a quality workflow for AI-assisted software development delivered **entirely as Agent Skills**. There is no CLI to install, no server, no database, and no provider SDK. A compatible coding agent discovers the skills, and the skills dictate the workflow: implementation, recorded validation, independent review, and per-criterion acceptance verification.
 
 Bones is opt-in per task. Naming or invoking Bones activates the workflow for that task only; ordinary requests must remain under the host agent's normal workflow.
 
+## Shape
+
+Bones ships five skills:
+
+| Skill | Role |
+| --- | --- |
+| `bones` | Router. Init, start/resume, the directive loop, stop reporting, integrity rules. Contains the directive scripts. |
+| `bones-implement` | Implementation and fix phase. |
+| `bones-validate` | Validation phase — runs configured checks through the recorder. |
+| `bones-review` | Independent review phase with a distinct actor. |
+| `bones-verify` | Acceptance-criterion verification phase. |
+
+The `bones` skill bundles three dependency-free Node scripts (`start.mjs`, `next.mjs`, `check.mjs`). These are not a CLI product: they are skill assets, never installed onto PATH, never versioned separately, and invoked only as `node <skill>/scripts/…` by an agent following the skill. They exist because "what is the next phase?" and "did this check really pass?" must be computed from recorded files, not from a model's recollection.
+
 ## User Promise
 
-Given the same recorded events and Git state, Bones returns the same next directive. It never claims that model output or external tools are deterministic. Instead, it turns their observable results into immutable evidence and applies deterministic gates to that evidence.
+Given the same recorded evidence files and Git state, the directive script returns the same next directive. Bones never claims model output or external tools are deterministic; it turns their observable results into recorded evidence and applies deterministic gates to that evidence.
 
-The first complete flow is:
+The complete flow is:
 
 ```text
-task snapshot
+run snapshot
   -> implementation commit
-  -> every configured check passes for that commit
+  -> every configured check passes for that commit (recorded)
   -> independent review has no policy-blocking findings
   -> every acceptance criterion is verified for that commit
   -> stop
 ```
 
-Any new commit invalidates earlier check, review, and verification evidence for advancement purposes while retaining it for audit.
+Any new commit invalidates earlier check, review, and verification evidence for advancement purposes while retaining it for audit inside the run directory.
+
+## Enforcement Model — Honest Boundaries
+
+A skills-only product cannot enforce the way a stateful backend can. Bones is explicit about its three enforcement tiers:
+
+1. **Computed gates** (strongest): the directive and check scripts derive phase, SHA binding, check status, actor independence, and criterion coverage from files plus Git. An agent that follows the loop cannot skip a phase, because the loop only ever surfaces one valid action.
+2. **Structural friction**: evidence schemas are validated on read; malformed or incomplete evidence produces a visible error instead of silent advancement.
+3. **Instructions** (weakest): "don't edit recorded evidence," "hand review to a genuinely distinct actor," "capture honest criterion evidence." A determined or careless agent can violate these; the skills make violations detectable (SHA binding, evidence trails) rather than impossible.
+
+Anything requiring tier-1 strength against an adversarial agent — cryptographic actor identity, tamper-proof event logs, runner-owned certification — is out of scope for the skills-only design and is listed as deferred.
 
 ## Provider Contract
 
 A provider needs only the ability to:
 
-- discover and read a `SKILL.md` file;
+- discover and read `SKILL.md` files in the open Agent Skills directory format;
 - read and modify a local worktree;
-- invoke `bones` with argv and parse JSON;
+- run `node` with argv and read stdout/stderr;
 - create Git commits;
-- hand off the review directive to a distinct actor when policy requires it.
+- hand the review directive to a distinct actor when policy requires it.
 
-Bones does not depend on provider session IDs or proprietary APIs. Actor records accept provider, model, and role metadata without using those strings to change gate behavior.
-
-The canonical skill follows the open Agent Skills directory format. `bones skill-install` copies it to `.agents/skills/bones` for a project or `~/.agents/skills/bones` for a user. Provider-specific installers can be added as thin adapters only when a client does not scan that convention.
-
-## Effect Grounding
-
-Effect is the application foundation, not a claim that effects themselves are deterministic:
-
-- Effect Schema validates every configuration, event, and submission boundary.
-- Tagged errors keep failures visible and machine-classifiable.
-- Effect programs describe asynchronous orchestration, concurrency, interruption, and cleanup.
-- The workflow reducer and directive function remain pure TypeScript functions.
-- Node and operating-system behavior stays behind narrow platform and storage modules.
-- Event replay, not hidden mutable process state, reconstructs a run.
-
-Future provider launchers, remote stores, telemetry exporters, and policy packs should enter as Effect services and Layers. They must not be imported into the pure domain kernel.
+Installation is copying the `skills/` directories into `.agents/skills/` (project) or `~/.agents/skills/` (user) — a file copy any agent or human can perform; the `bones` skill's init section covers it.
 
 ## State and Trust
 
-Project policy, identity, and transient payloads live under the ignored `.bones/` directory. `bones init` adds `.bones/` to the repository's `.gitignore`, creating that file when absent. Teams may deliberately force-add selected policy files, but Bones does not do so automatically. Runtime events live in the native user-state directory, outside the worktree.
+All state lives in the project worktree under the Git-ignored `.bones/` directory:
 
-The local event store provides:
+- `.bones/project.json` — project identity.
+- `.bones/workflow.json` — validation checks, review policy, verification policy. Snapshotted immutably into each run at start.
+- `.bones/runs/<run-id>/` — the run snapshot plus implementation, check, review, and verification evidence, each bound to an exact Git SHA.
 
-- one immutable event per UTF-8 JSON file;
-- canonical JSON SHA-256 integrity hashes and previous-hash chaining;
-- exclusive append locking and stale-lock recovery;
-- expected-revision concurrency checks;
-- idempotency keys;
-- temporary-file write, sync, and atomic rename.
-
-This detects accidental corruption and local edits; it is not a defense against an administrator or malicious process that can rewrite the entire state directory. Signed events or a remote transparency log are possible later adapters.
+There is no state outside the worktree. Moving or deleting `.bones/` deletes run history; teams may deliberately force-add selected files to Git for durability. Evidence files are plain JSON: readable, diffable, and auditable by humans. Integrity against a malicious writer is explicitly not claimed.
 
 ## Portability Definition
 
-Supported means the same package and CLI protocol run on Linux, macOS, and native Windows with Node.js 22 or 24 LTS and Git. Product code uses Node path/filesystem APIs and executable-plus-argv spawning, not Bash or PowerShell scripts. CI contains all six OS/Node combinations and runs type checking, build, unit tests, a complete CLI lifecycle, skill validation, and `doctor`.
-
-Local development currently proves Linux. Hosted macOS and Windows support becomes verified when the repository is pushed and its matrix completes; documentation must not describe an unrun matrix as observed proof.
+Supported means the skills and their scripts run on Linux, macOS, and native Windows with Node.js 22+ and Git. Scripts use Node path and filesystem APIs and argv spawning — no Bash, PowerShell, or shell-string interpolation. CI validates skill structure and runs the directive-loop exercise on all three operating systems.
 
 ## MVP Boundary
 
 Included now:
 
-- project and user skill installation;
-- explicit invocation with implicit activation disabled on supporting hosts;
-- inline request capture without task or ticket files;
-- project initialization and validation-command detection for Node, Rust, and Go;
-- resumable task runs;
-- Git-SHA and policy snapshots;
-- recorded command execution;
+- five skills in the open Agent Skills format;
+- explicit invocation with implicit activation disabled in every description;
+- inline request capture without ticket or task files;
+- resumable runs recomputed from files and Git on every step;
+- immutable per-run policy snapshots;
+- recorded check execution with output digests;
 - structured independent review findings;
-- structured acceptance-criterion verification;
-- stale-directive, revision-conflict, and integrity protection;
-- machine-readable and human CLI output.
+- structured per-criterion verification;
+- SHA-drift, self-review, and dishonest-coverage rejection in the directive script.
 
 Deferred deliberately:
 
-- direct provider launching and credentials;
-- hosted collaboration or remote event synchronization;
-- signed releases and automatic updates;
-- Windows ARM and Linux distribution-specific support guarantees;
-- container/sandbox orchestration for clean-room verification;
-- cryptographic actor identity and remote attestation;
+- any installed CLI, daemon, server, or database;
+- provider launching and credentials;
+- hosted collaboration or remote synchronization;
+- hash-chained or signed event logs and cryptographic actor identity;
+- container orchestration for clean-room verification;
 - a UI or project-management layer.
 
-These additions may extend adapters and evidence types, but may not weaken the central rule: only the deterministic kernel advances a run.
+These may return later as optional layers, but may not weaken the central rule: only the directive script decides the next phase.

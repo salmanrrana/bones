@@ -2,59 +2,72 @@
 
 ## Product Boundary
 
-Bones contains two distributable pieces:
-
-1. The canonical `skills/bones/SKILL.md` instruction package.
-2. The `bones` CLI and deterministic workflow kernel.
-
-The skill is a client of the CLI protocol. It is never a source of workflow truth.
-
-## Deterministic Core
-
-Effect supplies typed errors, schema validation, composition, interruption, and platform integration. Deterministic decisions come from the pure reducer plus captured events; Bones does not assume that an AI model or subprocess becomes deterministic merely because it runs inside an Effect program.
-
-The core uses an event-sourced model:
+Bones is a single distributable: the `skills/` directory. Five skills define the workflow; three bundled scripts inside the `bones` skill compute directives and record check evidence. Nothing is compiled, installed, or served.
 
 ```text
-command -> decide -> events -> evolve -> state -> next directive
+skills/bones            Router skill + scripts (start, next, check, shared state helpers)
+skills/bones-implement  Implementation / fix phase skill
+skills/bones-validate   Validation phase skill
+skills/bones-review     Independent review phase skill
+skills/bones-verify     Acceptance verification phase skill
 ```
 
-External work remains nondeterministic, including model output and subprocess behavior. Bones captures those results as typed, immutable evidence and makes all subsequent gate decisions deterministically.
+## Control Flow
 
-Every recorded artifact is bound to:
-
-- Run ID and event revision
-- Git SHA
-- Workflow configuration hash
-- Actor and provider, plus model and role when available
-- Idempotency key
-
-Changing code after validation or review invalidates evidence tied to the previous SHA.
-
-## Layers
+The `bones` skill runs a directive loop. Each iteration asks `next.mjs` for the one valid action, loads the matching phase skill, performs exactly that action, and asks again:
 
 ```text
-src/domain       Pure schemas, events, state evolution, directives
-src/application  Effect use cases and orchestration
-src/platform     Portable filesystem, path, hashing, and process adapters
-src/storage      Append-only event persistence
-src/cli.ts       CLI adapter
-skills/bones     Provider-neutral Agent Skill
+next.mjs reads: run snapshot + evidence files + git HEAD + worktree status
+          |
+          v
+   directive kind ---> phase skill ---> new evidence file / commit
+          ^                                    |
+          +------------------------------------+
 ```
-
-## Initial State Flow
 
 ```text
-implementation -> validation -> review -> verification -> done
-       ^              |           |             |
-       +--------------+-----------+-------------+
-                    failure or blocking finding
+implement -> validate -> review -> verify -> stop
+    ^            |          |          |
+    +------------+----------+----------+
+        check failure, blocking finding, or failed verification -> fix
 ```
 
-Only the workflow kernel may advance a run. Provider adapters may launch agents and normalize events, but cannot weaken gates.
+The phase sequence is not stored anywhere; it is re-derived from evidence on every call. That is what makes runs resumable across sessions, providers, and interruptions: there is no in-memory workflow state to lose.
 
-## Persistence
+## Gate Rules (computed by `next.mjs`)
 
-Runtime state lives outside the source worktree in the operating system's application-state directory. Project policy lives in `.bones/workflow.json` and may be committed.
+- No implementation recorded → `implement`.
+- HEAD differs from the recorded implementation SHA → `implement` (drift invalidates everything downstream).
+- Any configured check without a passing record for the implementation SHA → `validate` with the pending list.
+- No review for the SHA → `review`. Reviewer id equal to implementer id under independent-actor policy → `review` again with the reason stated.
+- Blocking-severity findings → `fix`.
+- No verification for the SHA → `verify`. `passed: true` with missing or failing criterion coverage → `verify` again. `passed: false` → `fix`.
+- Clean-worktree policy with a dirty tree → `verify` again after cleanup.
+- Otherwise → `stop`.
 
-The first persistence adapter stores one immutable, hash-chained event per file with exclusive creation, idempotency keys, locks, atomic rename, and revision checks. This avoids a native database dependency while preserving crash recovery and portability. A SQLite projection may be added later without changing the event schemas.
+## Evidence Layout
+
+```text
+.bones/
+  project.json                     project identity
+  workflow.json                    editable policy (snapshotted per run)
+  runs/<run-id>/
+    run.json                       immutable snapshot: request, baseSha, policy
+    implementation.json            latest implementation commit + actor
+    checks/<check-id>.json         one record per check, superseded by re-runs
+    review.json                    findings + reviewer actor, bound to SHA
+    verification.json              per-criterion evidence, bound to SHA
+```
+
+Every evidence file names the exact Git SHA it certifies. Evidence for an older SHA remains on disk for audit but can never satisfy a gate for a newer SHA.
+
+## Scripts Are Skill Assets, Not a CLI
+
+`start.mjs`, `next.mjs`, and `check.mjs` (plus the shared `state.mjs`) are plain ES modules with zero dependencies, requiring only Node 22+ and Git. They are invoked in place from the skill directory. Design rules:
+
+- Pure functions of files + Git state; no hidden mutable state, no daemon, no lockfiles.
+- JSON result on stdout, JSON error on stderr, non-zero exit on failure.
+- Argv spawning only (`shell: false`); no shell-string construction anywhere.
+- `check.mjs` executes the argv snapshotted at run start — never a caller-supplied command — and records exit code, duration, and output digests.
+
+If a future need outgrows these constraints (remote state, signing, provider launching), that becomes a new optional layer — the skills must keep working without it.

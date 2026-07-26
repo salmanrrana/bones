@@ -1,6 +1,0 @@
-interface:
-  display_name: "Bones"
-  short_description: "Opt-in deterministic quality workflow"
-  default_prompt: "Use $bones explicitly to complete this task through its deterministic quality workflow."
-policy:
-  allow_implicit_invocation: false
