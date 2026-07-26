@@ -1,27 +1,6 @@
 # 🦴 Bones
 
-**A quality workflow for AI coding agents that is literally just skills.** No CLI to install, no server, no database, no accounts. You copy five folders of markdown (plus three tiny Node scripts) into your agent's skills directory, say `$bones`, and your agent stops being able to say "done!" without proving it.
-
-## ELI5 — what is this?
-
-You know how an AI agent will happily write some code, run half a test, and declare victory? Bones is the adult in the room.
-
-**Bones is slang for dominoes — the game.** So imagine a domino table, a set of tiles, and a strict referee.
-
-The agent is the player: they do the actual coding. Bones is the referee and the line of tiles. It keeps the game simple:
-
-- **Five dominoes** are the five phases: implement → validate → review → verify → stop.
-- **Each tile has to be legitimately played** before the next tile can be played. A passing test is not a review. A review is not acceptance proof.
-- **The referee (`next.mjs`) checks the table** — real files, real receipts, and real Git — then tells the agent which single tile is next.
-- **Every play leaves a scorecard entry**: a JSON evidence file stamped with the exact Git commit it proves something about.
-
-```text
-🁢 implement → 🁢 validate → 🁢 review → 🁢 verify → 🏁 stop
-```
-
-Here's the part that keeps the game honest: **make a new commit, and every later tile is put back on the table.** The test, review, and verification receipts were for the old commit, so the chain starts again at `implement`. Try to review your own code? The referee rejects the play — the reviewer must be a different actor. Claim verification passed while a criterion failed? The referee reads the scorecard and rejects that play too.
-
-That's the whole trick: **the workflow can't drift, because it isn't remembered — it is rechecked against the table every single turn.**
+Bones gives AI coding work a clear structure. The AI does the work; Bones keeps it in the right order and makes sure it is checked before it is called done.
 
 ## Install
 
@@ -29,106 +8,64 @@ That's the whole trick: **the workflow can't drift, because it isn't remembered 
 npx skills add salmanrrana/bones --all
 ```
 
-That installs all five skills into your agent's skills directory (works with Claude Code, Cursor, Codex, OpenCode, and anything else that reads Agent Skills). Prefer picking manually? `npx skills add salmanrrana/bones --list`.
+This installs the Bones skills for your coding agent. Bones requires Node.js 24+ and Git.
 
-Manual install is just a file copy:
+## Use it
 
-```bash
-cp -r skills/* .agents/skills/        # project-local
-cp -r skills/* ~/.agents/skills/      # or user-wide
-```
+Mention `$bones` when you ask for a task:
 
-Requirements: **Node.js 24+** and **Git** on PATH. That's it — the scripts run in place, nothing gets built or installed globally.
+> Run this through `$bones`: add a function that calculates 2 + 2. It must return 4 and the tests must pass.
 
-## Use
+Without `$bones`, nothing changes about the agent's normal workflow.
 
-Bones is strictly opt-in. It only activates when you name it:
+## How it works
 
-> Run this through **$bones**: fix the login timeout. Acceptance criteria: session survives 30 minutes idle; the auth tests pass.
+Bones moves every task through four checks before it is done:
 
-Ordinary requests without `$bones` never trigger the workflow.
-
-## The flow
+1. **Implement** — write the code.
+2. **Validate** — run the configured tests and checks.
+3. **Review** — have a different actor inspect the change.
+4. **Verify** — prove that every requirement works.
+5. **Done** — report the result.
 
 ```mermaid
 flowchart TD
-    A["🗣️ You invoke $bones with a task<br/>+ acceptance criteria"] --> B["📸 start.mjs snapshots the request,<br/>base commit, and quality policy<br/>into .bones/runs/&lt;run-id&gt;/"]
-    B --> LOOP
-
-    subgraph LOOP["🔁 The domino line — ask next.mjs, obey, repeat"]
-        N{"🦴 next.mjs reads the receipts<br/>+ git HEAD and answers:<br/>which ONE domino is next?"}
-
-        N -->|implement / fix| I["🔨 bones-implement<br/>write code, commit it,<br/>record the commit SHA"]
-        N -->|validate| V["✅ bones-validate<br/>check.mjs runs the project's real<br/>checks and records the results"]
-        N -->|review| R["🔍 bones-review<br/>a DIFFERENT actor reviews the<br/>exact commit, records findings"]
-        N -->|verify| Y["🧪 bones-verify<br/>prove every acceptance criterion<br/>with real evidence, per criterion"]
-
-        I --> N
-        V -->|a check failed| N
-        V -->|all checks pass| N
-        R -->|blocking findings → fix| N
-        R -->|clean| N
-        Y -->|criterion failed → fix| N
-        Y -->|all criteria proven| N
-    end
-
-    N -->|stop 🏁| Z["📋 Final report: run id, final SHA,<br/>check results, review findings,<br/>evidence per criterion"]
-
-    NEW["⚠️ Any new commit at any point"] -.->|puts every later domino<br/>back on the table — replay from implement| N
+    A["Ask for a change"] --> B["1. Implement"]
+    B --> C["2. Validate"]
+    C -->|Fails| B
+    C -->|Passes| D["3. Review"]
+    D -->|Problems| B
+    D -->|Looks good| E["4. Verify"]
+    E -->|Fails| B
+    E -->|Passes| F["5. Done"]
 ```
 
-And the plays the referee rejects:
+For the 2 + 2 example:
 
-```mermaid
-flowchart LR
-    subgraph GATES["🚧 A domino only gets played with a real receipt"]
-        G1["HEAD ≠ recorded SHA<br/>→ chain restarts at implement"]
-        G2["Check not recorded by check.mjs<br/>→ doesn't count, still pending"]
-        G3["Reviewer id == implementer id<br/>→ review rejected, get a real reviewer"]
-        G4["passed: true but a criterion failed<br/>→ re-verify honestly"]
-        G5["Dirty worktree at the finish line<br/>→ clean it, re-verify"]
-    end
-```
+- the agent adds the function;
+- the tests run;
+- a different actor reviews the change;
+- the agent calls the function and proves it returns `4`;
+- Bones reports that the task is done.
 
-## What's actually in the box
+If the code changes later, the checks start again. Old results only prove that the old Git commit worked.
+
+## The five skills
 
 ```text
-skills/bones            🦴 The referee: init, start/resume, the domino line, stop report
-  └── scripts/          start.mjs · next.mjs · check.mjs · state.mjs (zero deps)
-skills/bones-implement  🔨 How to play the implement/fix domino
-skills/bones-validate   ✅ How to play the validate domino
-skills/bones-review     🔍 How to play the review domino (independence rules)
-skills/bones-verify     🧪 How to play the verify domino (evidence rules)
-docs/                   Spec, architecture, state format, platform support
-scripts/                Repo-side validator (development only)
+bones            controls the workflow and chooses the next step
+bones-implement  writes or fixes the code
+bones-validate   runs the configured checks
+bones-review     records the independent review
+bones-verify     records proof for each requirement
 ```
 
-All run state lives in your project under Git-ignored `.bones/`:
-
-```text
-.bones/
-  workflow.json                 your policy: which checks, what blocks, how strict
-  runs/<run-id>/
-    run.json                    the frozen snapshot: request + policy + base SHA
-    implementation.json         "here's the commit I made" 🧾
-    checks/<id>.json            "here's what really happened when the check ran" 🧾
-    review.json                 "here's what an independent reviewer found" 🧾
-    verification.json           "here's proof for each acceptance criterion" 🧾
-```
-
-Every receipt is plain JSON you can read, diff, and audit. Every receipt names the exact Git SHA it certifies.
-
-## Honest fine print
-
-Bones makes cheating **detectable, not impossible**. The phase order, SHA binding, actor independence, and criterion coverage are computed by script — an agent following the loop cannot skip a gate. But "don't hand-edit the receipts" is an instruction, not cryptography. If you need tamper-proof enforcement against an adversarial agent, you need a stateful backend, which is exactly what Bones deliberately isn't. See [docs/product-spec.md](docs/product-spec.md#enforcement-model--honest-boundaries) for the full three-tier breakdown.
+Bones stores readable evidence files under `.bones/`. There is no CLI, server, database, or required account.
 
 ## Development
 
 ```bash
-node scripts/validate-skills.mjs   # validates all 5 skills + runs the full lifecycle
-                                   # (including the cheat attempts) in a temp repo
+node scripts/validate-skills.mjs
 ```
-
-No dependencies, no install step. CI runs the same script on Linux, macOS, and Windows with Node 24 and 26.
 
 More detail: [product spec](docs/product-spec.md) · [architecture](docs/architecture.md) · [state format](docs/state-format.md) · [platform support](docs/platform-support.md)
